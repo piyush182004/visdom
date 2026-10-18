@@ -266,6 +266,49 @@ def test_image_store_history_without_a_window_id_stays_an_event(capture_send):
     assert sent["endpoint"] == "events"
 
 
+@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.uint16])
+def test_image_shows_integers_in_byte_range_like_uint8(capture_send, dtype):
+    """A torch long tensor or an int array of 0..255 crashed PIL before."""
+    img = np.random.RandomState(0).randint(0, 256, (3, 8, 8))
+    shown = decode(capture_send(lambda v: v.image(img.astype(dtype))))[1]
+    expected = decode(capture_send(lambda v: v.image(img.astype(np.uint8))))[1]
+    np.testing.assert_array_equal(shown, expected)
+
+
+def test_image_scales_a_16_bit_image_to_fill_the_byte_range(capture_send):
+    """PIL read uint16 byte by byte, so a depth map came out as stripes."""
+    depth = np.array([[500, 1000], [3000, 65000]], dtype=np.uint16)
+    pixels = decode(capture_send(lambda v: v.image(depth)))[1]
+    assert pixels.tolist() == [[0, 2], [10, 255]]
+
+
+def test_image_scales_negative_integers(capture_send):
+    pixels = decode(capture_send(lambda v: v.image(np.array([[-10, 0], [5, 10]]))))[1]
+    assert pixels.tolist() == [[0, 128], [191, 255]]
+
+
+def test_image_shows_a_constant_wide_integer_image_as_black(capture_send):
+    pixels = decode(capture_send(lambda v: v.image(np.full((4, 4), 4000, np.uint16))))[
+        1
+    ]
+    assert not pixels.any()
+
+
+@pytest.mark.parametrize("shape", [(8, 8), (3, 8, 8)], ids=["2d", "3ch"])
+def test_image_shows_a_bool_mask_as_black_and_white(capture_send, shape):
+    mask = np.zeros(shape, dtype=bool)
+    mask[..., 2:5, 2:5] = True
+    pixels = decode(capture_send(lambda v: v.image(mask)))[1]
+    assert sorted(np.unique(pixels).tolist()) == [0, 255]
+
+
+def test_images_scales_a_16_bit_batch_with_one_range(capture_send):
+    """The batch shares one scale, so equal depths look equal in every tile."""
+    batch = np.array([[[[500, 3000]]], [[[3000, 65000]]]], dtype=np.uint16)
+    pixels = decode(capture_send(lambda v: v.images(batch, padding=0)))[1]
+    assert pixels[0, :, 0].tolist() == [0, 10, 10, 255]
+
+
 @pytest.mark.parametrize(
     "img, message",
     [

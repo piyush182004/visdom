@@ -568,6 +568,23 @@ def _to_numpy(a):
     return a
 
 
+def _integer_image_to_uint8(img):
+    """PIL only reads uint8 here: other ints crash or are read byte by byte."""
+    if img.dtype == bool:
+        return img.astype(np.uint8) * 255
+    if not np.issubdtype(img.dtype, np.integer) or img.dtype == np.uint8:
+        return img
+    if img.size == 0:
+        return img.astype(np.uint8)
+    lo, hi = int(img.min()), int(img.max())
+    if 0 <= lo and hi <= 255:
+        return img.astype(np.uint8)
+    if hi == lo:
+        return np.zeros(img.shape, dtype=np.uint8)
+    scaled = (img.astype(np.float64) - lo) / (hi - lo) * 255.0
+    return np.round(scaled).astype(np.uint8)
+
+
 def pytorch_wrap(f):
     @wraps(f)
     def wrapped_f(*args, **kwargs):
@@ -2288,7 +2305,9 @@ class Visdom(object):
         range is within [-1, 1] but includes negative values are mapped from
         [-1, 1] to [0, 255]; all other float values are clipped to [0, 255].
         Pass `opts.normalize=True` to min-max scale the image to fill [0, 255]
-        instead.
+        instead. Other integer images are shown as they are when their values
+        fit in [0, 255] and are scaled to fill it otherwise (e.g. 16-bit depth
+        maps); boolean masks are shown as 0 / 255.
 
         The following `opts` are supported:
 
@@ -2300,6 +2319,7 @@ class Visdom(object):
         opts = {} if opts is None else dict(opts)
         _title2str(opts)
         _assert_opts(opts)
+        img = _integer_image_to_uint8(img)
         if np.issubdtype(img.dtype, np.floating):
             finite = img[np.isfinite(img)]
             if finite.size > 0:
@@ -2583,6 +2603,8 @@ class Visdom(object):
         # If list of images, convert to a 4D tensor
         if isinstance(tensor, list):
             tensor = np.stack(tensor, 0)
+        # One scale for the whole batch, so the tiles stay comparable.
+        tensor = _integer_image_to_uint8(np.asarray(tensor))
 
         if tensor.ndim == 2:  # single image H x W
             tensor = np.expand_dims(tensor, 0)
