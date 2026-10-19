@@ -171,6 +171,14 @@ def isndarray(n):
     return isinstance(n, (np.ndarray))
 
 
+def _numpy_friendly(a):
+    """Upcast torch dtypes numpy has no type for; float32 holds them exactly."""
+    dtype = str(getattr(a, "dtype", ""))
+    if dtype == "torch.bfloat16" or dtype.startswith("torch.float8_"):
+        return a.float()
+    return a
+
+
 from visdom.utils.shared_utils import NanSafeEncoder
 
 # TODO: In appropriate places, we need to change many numpy calls to use
@@ -574,8 +582,8 @@ def _to_numpy(a):
 def pytorch_wrap(f):
     @wraps(f)
     def wrapped_f(*args, **kwargs):
-        args = (_to_numpy(arg) for arg in args)
-        kwargs = {k: _to_numpy(v) for (k, v) in kwargs.items()}
+        args = (_to_numpy(_numpy_friendly(arg)) for arg in args)
+        kwargs = {k: _to_numpy(_numpy_friendly(v)) for (k, v) in kwargs.items()}
         return f(*args, **kwargs)
 
     return wrapped_f

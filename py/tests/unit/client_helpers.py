@@ -305,6 +305,45 @@ def test_axisformat3d_applies_a_lone_tick_step():
     assert axis["nticks"] is None
 
 
+# ------------------------------------------------- tensors numpy can't hold ----
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda v, t: v.line(Y=t),
+        lambda v, t: v.histogram(X=t),
+        lambda v, t: v.audio(tensor=t, opts={"sample_frequency": 8000}),
+        lambda v, t: v.image(t.reshape(1, 4, 8).abs()),
+    ],
+    ids=["line", "histogram", "audio", "image"],
+)
+def test_bfloat16_tensors_are_sent_like_float32(capture_send, call):
+    """numpy has no bfloat16, so .numpy() raised; float32 holds it exactly."""
+    torch = pytest.importorskip("torch")
+    values = torch.linspace(-1, 1, 32).to(torch.bfloat16)
+    sent = capture_send(lambda v: call(v, values))
+    expected = capture_send(lambda v: call(v, values.float()))
+    assert sent["payload"]["data"] == expected["payload"]["data"]
+
+
+def test_float8_tensors_are_sent_like_float32(capture_send):
+    torch = pytest.importorskip("torch")
+    if not hasattr(torch, "float8_e4m3fn"):
+        pytest.skip("this torch has no float8")
+    values = torch.linspace(0, 1, 16).to(torch.float8_e4m3fn)
+    sent = capture_send(lambda v: v.line(Y=values))
+    expected = capture_send(lambda v: v.line(Y=values.float()))
+    assert sent["payload"]["data"] == expected["payload"]["data"]
+
+
+def test_a_bfloat16_parameter_with_grad_is_sent(capture_send):
+    torch = pytest.importorskip("torch")
+    weight = torch.nn.Parameter(torch.ones(4, dtype=torch.bfloat16))
+    sent = capture_send(lambda v: v.line(Y=weight))
+    assert sent["payload"]["data"][0]["y"] == [1.0, 1.0, 1.0, 1.0]
+
+
 def test_opts2layout_builds_flat_axes_in_2d():
     """A 2d plot carries xaxis and yaxis at the top level."""
     layout = _opts2layout({"xlabel": "e", "ylabel": "l"})
