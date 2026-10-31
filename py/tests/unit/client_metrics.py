@@ -1029,9 +1029,16 @@ def test_calibration_curve_accepts_a_single_column(capture_send):
 
 
 def test_calibration_curve_allows_a_single_class():
-    """A batch with no positives is still valid input."""
-    prob_true, _, _, _ = _compute_calibration_curve([0, 0], [0.2, 0.7])
+    """A batch with no positives is still valid input, but not a silent one."""
+    with pytest.warns(UserWarning, match="no samples of pos_label=1"):
+        prob_true, _, _, _ = _compute_calibration_curve([0, 0], [0.2, 0.7])
     assert prob_true.tolist() == [0.0, 0.0]
+
+
+def test_calibration_curve_points_the_warning_at_the_caller(capture_send):
+    with pytest.warns(UserWarning, match="no samples") as record:
+        capture_send(lambda v: v.calibration_curve([0, 0], [0.2, 0.7], pos_label=1))
+    assert record[0].filename == __file__
 
 
 @pytest.mark.parametrize(
@@ -1044,16 +1051,37 @@ def test_calibration_curve_allows_a_single_class():
         ([0, 0], 1, [0.0, 0.0]),
         ([1, 1], 0, [0.0, 0.0]),
         ([False, False], True, [0.0, 0.0]),
+        (["ham", "ham"], "spam", [0.0, 0.0]),
+        ([0, 0], np.int64(1), [0.0, 0.0]),
+        ([0, 0], 10**30, [0.0, 0.0]),
+        ([b"ham", b"ham"], b"ham", [1.0, 1.0]),
+    ],
+    ids=[
+        "minus-ones",
+        "falses",
+        "ones",
+        "strings-present",
+        "zeros-pos-1",
+        "ones-pos-0",
+        "falses-pos-true",
+        "strings-absent",
+        "numpy-int",
+        "huge-int",
+        "bytes-present",
     ],
 )
 def test_calibration_curve_single_class_with_a_known_positive(
     y_true, pos_label, expected
 ):
-    """One class is fine when the positive class is clear."""
-    prob_true, _, _, _ = _compute_calibration_curve(
-        y_true, [0.2, 0.7], n_bins=2, pos_label=pos_label
-    )
+    """One class can't show what the other is, so an absent pos_label of the
+    same kind is valid: every sample is negative, and a warning says so."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        prob_true, _, _, _ = _compute_calibration_curve(
+            y_true, [0.2, 0.7], n_bins=2, pos_label=pos_label
+        )
     assert prob_true.tolist() == expected
+    assert bool(caught) == (expected == [0.0, 0.0])
 
 
 @pytest.mark.parametrize(
@@ -1062,12 +1090,38 @@ def test_calibration_curve_single_class_with_a_known_positive(
         (["spam", "spam"], None, "pos_label is not specified"),
         (["1", "1"], None, "pos_label is not specified"),
         ([2, 2], None, "pos_label is not specified"),
-        (["ham", "spam"], 1, "pos_label=1 is not one of"),
+        (["ham", "spam"], 1, "pos_label=1 can't be a label"),
         ([0, 2], 1, "pos_label=1 is not one of"),
+        ([0, 2], 10**30, "is not one of"),
+        (["spam", "spam"], 1, "pos_label=1 can't be a label"),
+        ([0, 0], "1", "pos_label='1' can't be a label"),
+        ([True, True], "True", "can't be a label"),
+        ([0, 0], float("nan"), "pos_label=nan can't be a label"),
+        ([0.0, 0.0], float("inf"), "pos_label=inf can't be a label"),
+        ([0, 0], [1], "can't be a label"),
+        (["spam", "spam"], b"spam", "can't be a label"),
+        ([b"spam", b"spam"], "spam", "can't be a label"),
+    ],
+    ids=[
+        "strings-no-pos",
+        "digit-strings-no-pos",
+        "twos-no-pos",
+        "number-for-two-strings",
+        "absent-from-two",
+        "huge-int-absent-from-two",
+        "number-for-one-string",
+        "string-for-numbers",
+        "string-for-bools",
+        "nan",
+        "inf",
+        "list",
+        "bytes-for-str",
+        "str-for-bytes",
     ],
 )
 def test_calibration_curve_refuses_an_unclear_pos_label(y_true, pos_label, message):
-    """No pos_label for non-{0, 1} labels, or one matching neither class."""
+    """No pos_label for non-{0, 1} labels, one of another kind than the labels
+    (with one class or two), or one matching neither of two classes."""
     with pytest.raises(ValueError, match=message):
         _compute_calibration_curve(y_true, [0.2, 0.7], pos_label=pos_label)
 
@@ -1088,9 +1142,11 @@ def test_calibration_curve_matches_sklearn_pos_label_rules():
         expected, _ = calibration.calibration_curve(
             y_true, y_prob, n_bins=2, pos_label=pos_label
         )
-        prob_true, _, _, _ = _compute_calibration_curve(
-            y_true, y_prob, n_bins=2, pos_label=pos_label
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # the no-positives cases warn
+            prob_true, _, _, _ = _compute_calibration_curve(
+                y_true, y_prob, n_bins=2, pos_label=pos_label
+            )
         np.testing.assert_allclose(prob_true, expected)
 
 
@@ -1100,7 +1156,7 @@ def test_calibration_curve_reads_object_arrays_by_their_values():
         np.array([0, 1, 1, 0], dtype=object), [0.1, 0.6, 0.9, 0.4], n_bins=2
     )
     assert prob_true.tolist() == [0.0, 1.0]
-    with pytest.raises(ValueError, match="pos_label=1 is not one of"):
+    with pytest.raises(ValueError, match="pos_label=1 can't be a label"):
         _compute_calibration_curve(
             np.array(["ham", "spam"], dtype=object), [0.2, 0.7], pos_label=1
         )

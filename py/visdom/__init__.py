@@ -810,12 +810,38 @@ def _label_vector(y_true):
     return np.array(values)
 
 
+def _could_be_label(labels, pos_label):
+    """Whether ``pos_label`` is a value of the same kind as ``labels``."""
+    if _is_missing(pos_label):
+        return False
+    kind = labels.dtype.kind
+    if kind in "biuf":
+        return isinstance(pos_label, numbers.Integral) or (
+            isinstance(pos_label, numbers.Real) and math.isfinite(pos_label)
+        )
+    if kind == "U":
+        return isinstance(pos_label, str)
+    if kind == "S":
+        return isinstance(pos_label, bytes)
+    return True
+
+
+def _equal_to(values, label):
+    """``values == label``, where an int too wide for the dtype matches nothing."""
+    try:
+        return values == label
+    except OverflowError:
+        return np.zeros(values.shape, dtype=bool)
+
+
 def _calibration_pos_label(labels, pos_label):
     """Return the positive class, following sklearn.
 
     Without ``pos_label`` the labels must be {0, 1} or {-1, 1} (or one of
-    them), and 1 is positive. When both classes are present, ``pos_label``
-    must be one of them; a single class without it has no positives.
+    them), and 1 is positive. A given ``pos_label`` must be a value of the
+    same kind as the labels, and one of them when both classes are present.
+    A single class can't show what the other class is, so there it may be
+    absent: those samples are all negatives.
     """
     if pos_label is None:
         values = set(labels.tolist())
@@ -828,7 +854,13 @@ def _calibration_pos_label(labels, pos_label):
                 "pos_label".format(labels.tolist())
             )
         return 1
-    if len(labels) == 2 and not np.any(labels == pos_label):
+    if not _could_be_label(labels, pos_label):
+        raise ValueError(
+            "pos_label={!r} can't be a label of y_true, which holds {}".format(
+                pos_label, labels.tolist()
+            )
+        )
+    if len(labels) == 2 and not np.any(_equal_to(labels, pos_label)):
         raise ValueError(
             "pos_label={!r} is not one of the labels {}".format(
                 pos_label, labels.tolist()
@@ -885,7 +917,13 @@ def _compute_calibration_curve(
     else:
         raise ValueError("strategy should be 'uniform' or 'quantile'")
 
-    positive = (y_true == pos_label).astype(float)
+    positive = _equal_to(y_true, pos_label).astype(float)
+    if not positive.any():
+        warnings.warn(
+            "y_true has no samples of pos_label={!r}, so every bin's fraction "
+            "of positives is 0".format(pos_label),
+            stacklevel=3,
+        )
     binids = np.searchsorted(bins[1:-1], y_prob)
     bin_sums = np.bincount(binids, weights=y_prob, minlength=n_bins)
     bin_true = np.bincount(binids, weights=positive, minlength=n_bins)
@@ -3908,7 +3946,9 @@ class Visdom(object):
 
         `pos_label` is the positive class. It can be left out when `y_true`
         holds {0, 1} or {-1, 1} labels (1 is positive); other labels, such as
-        strings, need it. When both classes are present it must be one of them.
+        strings, need it. It must be a value of the same kind as the labels,
+        and one of them when both classes are present. If no sample is
+        positive, a warning says so, since every bin's fraction is then 0.
 
         The following `opts` are supported:
 

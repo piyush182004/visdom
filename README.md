@@ -1252,7 +1252,8 @@ same number of samples); empty bins are skipped. The binning is the same as
 samples are in its bin, and the title shows the expected calibration error
 (ECE). `pos_label` is the positive class; it can be left out for {0, 1} or
 {-1, 1} labels (1 is positive), and is required for other labels such as
-strings. When both classes are present it must be one of them.
+strings. It must be a value of the same kind as the labels, and one of them
+when both classes are present. If no sample is positive, a warning says so.
 
 ```python
 vis.calibration_curve(y_true, y_prob, n_bins=10, strategy="uniform")
