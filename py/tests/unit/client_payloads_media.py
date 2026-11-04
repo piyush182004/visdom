@@ -193,6 +193,45 @@ def test_image_keeps_rgba_as_png_despite_a_jpeg_quality(capture_send):
     assert pixels.shape[2] == 4
 
 
+_GRADIENT = np.linspace(0, 255, 3 * 8 * 8).reshape(3, 8, 8).astype(np.uint8)
+_JPEG_CALLS = {
+    "image": lambda v, opts: v.image(_GRADIENT, opts=opts),
+    "images": lambda v, opts: v.images(np.stack([_GRADIENT] * 2), opts=opts),
+    "image_heatmap": lambda v, opts: v.image_heatmap(_GRADIENT, np.eye(8), opts=opts),
+}
+
+
+@pytest.mark.parametrize(
+    "quality",
+    [75.0, 100.0, 1.0, np.float32(75), np.float64(30), np.int64(75), np.int32(90)],
+    ids=["75.0", "100.0", "1.0", "float32", "float64", "int64", "int32"],
+)
+@pytest.mark.parametrize("call", list(_JPEG_CALLS), ids=list(_JPEG_CALLS))
+def test_jpeg_quality_accepts_any_whole_number(capture_send, call, quality):
+    """Pillow wants an int, so 75.0 or np.int64(75) raised 'Invalid quality setting'."""
+    send = _JPEG_CALLS[call]
+    sent = capture_send(lambda v: send(v, {"jpgquality": quality}))
+    reference = capture_send(lambda v: send(v, {"jpgquality": int(quality)}))
+    content = sent["payload"]["data"][0]["content"]["src"]
+    assert content.startswith("data:image/jpeg;base64,")
+    assert content == reference["payload"]["data"][0]["content"]["src"]
+
+
+@pytest.mark.parametrize(
+    "quality, rounded",
+    [(50.4, 50), (99.6, 100), (0.9 * 100, 90), (np.float32(74.5), 74)],
+    ids=["50.4", "99.6", "computed_90", "float32_half"],
+)
+@pytest.mark.parametrize("call", list(_JPEG_CALLS), ids=list(_JPEG_CALLS))
+def test_jpeg_quality_rounds_a_fraction(capture_send, call, quality, rounded):
+    """0.9 * 100 is 90.00000000000001, which is still meant as 90."""
+    send = _JPEG_CALLS[call]
+    sent = capture_send(lambda v: send(v, {"jpgquality": quality}))
+    reference = capture_send(lambda v: send(v, {"jpgquality": rounded}))
+    content = sent["payload"]["data"][0]["content"]["src"]
+    assert content == reference["payload"]["data"][0]["content"]["src"]
+
+
 def test_image_store_history_switches_the_pane_type(capture_send):
     sent = capture_send(
         lambda v: v.image(

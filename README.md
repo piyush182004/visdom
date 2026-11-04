@@ -875,7 +875,7 @@ img = img.permute(2, 0, 1)     # PyTorch
 
 The following `opts` are supported:
 
-- `jpgquality`: JPG quality (`number` 0-100). If defined image will be saved as JPG to reduce file size. If not defined image will be saved as PNG.
+- `jpgquality`: JPG quality (`number` 0-100, rounded to a whole number). If defined image will be saved as JPG to reduce file size. If not defined image will be saved as PNG.
 - `compresslevel`: PNG compression level (`integer` 0-9; default = `6`). Lower is faster and larger, `0` stores the image uncompressed. Ignored when `jpgquality` selects JPEG.
 - `caption`: Caption for the image
 - `store_history`: Keep all images stored to the same window and attach a slider to the bottom that will let you select the image to view. You must always provide this opt when sending new images to an image with history.
@@ -917,7 +917,7 @@ The following `opts` are supported:
 - `alpha`: blend strength (`float` in `[0, 1]`; default = `0.5`). Higher values make the heatmap more visible.
 - `colormap`: matplotlib colormap name (`string`; default = `'jet'`). Falls back to a blue-red gradient if matplotlib is not installed.
 - `caption`: caption for the image pane
-- `jpgquality`: JPG quality (`number` 0-100). If set, the result is encoded as JPEG. Otherwise PNG.
+- `jpgquality`: JPG quality (`number` 0-100, rounded to a whole number). If set, the result is encoded as JPEG. Otherwise PNG.
 - `compresslevel`: PNG compression level (`integer` 0-9; default = `6`). Lower is faster and larger, `0` stores the image uncompressed. Ignored when `jpgquality` selects JPEG.
 - `normalize`: normalize the image to `[0, 1]` before blending (`boolean`; default = `False`)
 
@@ -932,7 +932,7 @@ The following arguments and `opts` are supported:
 
 - `nrow`: Number of images in a row
 - `padding`: Padding around the image, equal padding around all 4 sides
-- `opts.jpgquality`: JPG quality (`number` 0-100). If defined image will be saved as JPG to reduce file size. If not defined image will be saved as PNG.
+- `opts.jpgquality`: JPG quality (`number` 0-100, rounded to a whole number). If defined image will be saved as JPG to reduce file size. If not defined image will be saved as PNG.
 - `opts.compresslevel`: PNG compression level (`integer` 0-9; default = `6`). Lower is faster and larger, `0` stores the image uncompressed. Ignored when `jpgquality` selects JPEG.
 - `opts.caption`: Caption for the image
 

@@ -31,7 +31,7 @@ img = img.permute(2, 0, 1)     # PyTorch
 
 | Option | Description |
 |--------|-------------|
-| `opts.jpgquality` | JPG quality (`number` 0-100). If defined image will be saved as JPG to reduce file size. If not defined image will be saved as PNG. |
+| `opts.jpgquality` | JPG quality (`number` 0-100, rounded to a whole number). If defined image will be saved as JPG to reduce file size. If not defined image will be saved as PNG. |
 | `opts.caption` | Caption for the image |
 | `opts.store_history` | Keep all images stored to the same window and attach a slider to the bottom that will let you select the image to view. You must always provide this opt when sending new images to an image with history. |
 
@@ -58,7 +58,7 @@ vis.images(np.random.rand(16, 3, 64, 64), nrow=4, opts=dict(title='Image Grid'))
 |--------|-------------|
 | `nrow` | Number of images in a row |
 | `padding` | Padding around the image, equal padding around all 4 sides |
-| `opts.jpgquality` | JPG quality (`number` 0-100) |
+| `opts.jpgquality` | JPG quality (`number` 0-100, rounded to a whole number) |
 | `opts.caption` | Caption for the image |
 
 ## vis.text

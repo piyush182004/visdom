@@ -2515,7 +2515,7 @@ class Visdom(object):
         The following `opts` are supported:
 
         - `opts.normalize`: min-max scale float image to [0, 255] (`boolean`; default = `False`)
-        - `opts.jpgquality`: quality of the JPEG image (`number` in (0, 100]; default = `None` for PNG)
+        - `opts.jpgquality`: quality of the JPEG image (`number` in (0, 100], rounded to a whole number; default = `None` for PNG)
         - `opts.compresslevel`: PNG compression level (`integer` in [0, 9]; default = `6`)
         - `opts.caption`: caption below the image (`string`; optional)
         - `opts.store_history`: append to image history pane (`boolean`)
@@ -2577,7 +2577,7 @@ class Visdom(object):
         jpgquality = opts.get("jpgquality")
         if jpgquality is not None and nchannels != 4:
             image_type = "jpeg"
-            imsave_args["quality"] = jpgquality
+            imsave_args["quality"] = int(round(jpgquality))  # Pillow takes an int
         elif opts.get("compresslevel") is not None:
             imsave_args["compress_level"] = int(opts["compresslevel"])
 
@@ -2651,7 +2651,7 @@ class Visdom(object):
         - `opts.alpha`:    heatmap blend strength (`float` in [0, 1]; default = 0.5)
         - `opts.colormap`: matplotlib colormap name (`string`; default = `'jet'`)
         - `opts.caption`:  caption below the image (`string`; optional)
-        - `opts.jpgquality`: JPEG quality (`number` in (0, 100]; default = PNG)
+        - `opts.jpgquality`: JPEG quality (`number` in (0, 100], rounded to a whole number; default = PNG)
         - `opts.compresslevel`: PNG compression level (`integer` in [0, 9]; default = `6`)
         - `opts.normalize`: min-max scale the base image (`boolean`; default = `False`)
         """
@@ -2749,7 +2749,7 @@ class Visdom(object):
         jpgquality = opts.get("jpgquality")
         if jpgquality is not None:
             image_type = "jpeg"
-            imsave_args["quality"] = jpgquality
+            imsave_args["quality"] = int(round(jpgquality))  # Pillow takes an int
         elif opts.get("compresslevel") is not None:
             imsave_args["compress_level"] = int(opts["compresslevel"])
         im.save(buf, format=image_type.upper(), **imsave_args)
