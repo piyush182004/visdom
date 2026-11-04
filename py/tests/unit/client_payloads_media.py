@@ -219,12 +219,12 @@ def test_jpeg_quality_accepts_any_whole_number(capture_send, call, quality):
 
 @pytest.mark.parametrize(
     "quality, rounded",
-    [(50.4, 50), (99.6, 100), (0.9 * 100, 90), (np.float32(74.5), 74)],
-    ids=["50.4", "99.6", "computed_90", "float32_half"],
+    [(50.4, 50), (99.6, 100), (0.57 * 100, 57), (np.float32(74.5), 74)],
+    ids=["50.4", "99.6", "computed_57", "float32_half"],
 )
 @pytest.mark.parametrize("call", list(_JPEG_CALLS), ids=list(_JPEG_CALLS))
 def test_jpeg_quality_rounds_a_fraction(capture_send, call, quality, rounded):
-    """0.9 * 100 is 90.00000000000001, which is still meant as 90."""
+    """0.57 * 100 is 56.99999999999999, which is still meant as 57."""
     send = _JPEG_CALLS[call]
     sent = capture_send(lambda v: send(v, {"jpgquality": quality}))
     reference = capture_send(lambda v: send(v, {"jpgquality": rounded}))
